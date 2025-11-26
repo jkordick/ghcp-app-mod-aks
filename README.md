@@ -15,6 +15,11 @@ have a look at #file:js-app  and update it to the latest node js version. after 
 - explain and show spec-kit usage
 - show generated spec-kit elements
 - show clarify
+
+````
+update #file:python-app to the latest python version. after the upgrade, run the app and test it
+````
+
 - kick-off modernization using spec-kit
 - wait until ghcp is finished
 
