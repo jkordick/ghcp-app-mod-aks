@@ -4,6 +4,11 @@
 - explain github copilot agent mode (explain agents)
 - explain tools/mcp
 - kick-off modernization using github copilot agent
+
+```
+have a look at #file:js-app  and update it to the latest node js version. after you are done upgrading, run the app and test it.
+```
+
 - wait until ghcp is finished
 
 # Step 2: Show how spec-kit can help to modernize the Python application

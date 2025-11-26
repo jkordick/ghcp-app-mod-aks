@@ -1,6 +1,6 @@
 # Insurance Quote API
 
-A Node.js 16 REST API for calculating insurance premium quotes based on vehicle type and driver age.
+A Node.js 22 REST API for calculating insurance premium quotes based on vehicle type and driver age.
 
 ## Features
 
@@ -144,6 +144,6 @@ Example error response:
 
 ## Requirements
 
-- Node.js 16.x
+- Node.js 22.x or higher
 - Express.js 4.x
 - CORS support enabled
