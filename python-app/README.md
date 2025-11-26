@@ -13,17 +13,29 @@ A Python 3.13 customer profile service using Python's built-in `http.server` mod
 - No external dependencies (except for testing)
 - Uses only Python standard library for maximum compatibility
 
+## Requirements
+
+- Python 3.13.x or later
+- Virtual environment (recommended)
+
 ## Installation
 
-1. Install dependencies:
+1. Create a Python 3.13 virtual environment:
+```bash
+python3.13 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+2. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
 ## Running the Service
 
-Start the development server:
+Start the development server using the virtual environment:
 ```bash
+source venv/bin/activate  # Activate virtual environment
 python main.py
 ```
 
@@ -52,9 +64,9 @@ curl -X PATCH "http://localhost:8000/customers/2" \
 
 ## Testing
 
-Run the test suite:
+Run the test suite using the virtual environment:
 ```bash
-pip install pytest
+source venv/bin/activate  # Activate virtual environment
 pytest test_main.py -v
 ```
 

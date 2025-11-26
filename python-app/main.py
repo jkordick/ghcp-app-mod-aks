@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python3.13
 """
 Simple Customer Profile Service using Python's built-in http.server
 Compatible with Python 3.13+
