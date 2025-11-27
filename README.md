@@ -19,7 +19,7 @@ have a look at #file:js-app  and update it to the latest node js version. after 
 ````
 update #file:python-app to the latest python version. after the upgrade, run the app and test it
 ````
-
+ 
 - kick-off modernization using spec-kit
 - wait until ghcp is finished
 
