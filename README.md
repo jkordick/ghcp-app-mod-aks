@@ -36,9 +36,9 @@ have a look at #file:js-app and update it to the latest node js version. after y
 - explain Azure MCP, BICEP, Azure Developer CLI
 - show already created Bicep files
 
-````
+```
  use bicep and azd to create an AKS automatic cluster in my azure subscription. use sweden central as region. deploy it afterwards.
- ```
+```
 
 - use azd to deploy the Node JS application to AKS
 
