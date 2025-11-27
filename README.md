@@ -30,6 +30,10 @@ update #file:python-app to the latest python version. after the upgrade, run the
 
 # Step 4: Show how to containerize the modernized applications
 - use GHCP to containerize the Python application
+
+```
+containerize the python application for me, build and run the container afterwards.
+```
 - show Dockerfile for Node JS application
 - show Dockerfile for Java application
 

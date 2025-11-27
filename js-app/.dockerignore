@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+README.md
+technical-documentation.md
+user-handbook.md
+tests
+*.test.js
+jest.config.js
+.env
+.DS_Store
+coverage

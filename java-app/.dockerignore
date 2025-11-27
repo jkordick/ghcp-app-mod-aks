@@ -1,0 +1,14 @@
+target
+.mvn
+.git
+.gitignore
+README.md
+technical-documentation.md
+user-handbook.md
+UPGRADE_SUMMARY.md
+*.md
+.settings
+.project
+.classpath
+.DS_Store
+*.log
