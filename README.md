@@ -4,6 +4,15 @@
 - explain github copilot agent mode (explain agents)
 - explain tools/mcp
 - kick-off modernization using github copilot agent
+
+```
+have a look at #file:js-app and make an assessmet what needs to be done to upgrade the app to the latest node js version. 
+```
+
+```
+have a look at #file:js-app and update it to the latest node js version. after you are done upgrading, run the app and test it.
+```
+
 - wait until ghcp is finished
 
 # Step 2: Show how spec-kit can help to modernize the Python application
@@ -26,6 +35,29 @@
 # Step 5: Show how to use the Azure, Azure Developer CLI and Bicep MCP servers to deploy the modernized applications to AKS
 - explain Azure MCP, BICEP, Azure Developer CLI
 - show already created Bicep files
+
+````
+ use bicep and azd to create an AKS automatic cluster in my azure subscription. use sweden central as region. deploy it afterwards.
+ ```
+
 - use azd to deploy the Node JS application to AKS
+
+```
+use azd to deploy the node js application to my existing aks cluster.
+```
+
 - use azd to deploy the Python application to AKS
+
+```
+use azd to deploy the python application to my existing aks cluster.
+```
+
 - use azd to deploy the Java application to AKS
+
+```
+use azd to deploy the java application to my existing aks cluster.
+```
+
+# Step 6 (Bonus): Setup GitHub Actions CI/CD to automate deployments to AKS
+- use GHCP to setup GitHub Actions CI/CD for the applications
+ 
