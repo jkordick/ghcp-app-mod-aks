@@ -20,3 +20,11 @@ services:
     language: java
     host: aks
     project: ./java-app
+
+# Hooks to set environment variables after provisioning
+hooks:
+  postprovision:
+    shell: sh
+    run: |
+      azd env set AZURE_AKS_CLUSTER_NAME $(azd env get-value AKS_CLUSTER_NAME)
+      azd env set AZURE_RESOURCE_GROUP $(azd env get-value AZURE_RESOURCE_GROUP)

@@ -31,7 +31,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-02-previ
     'azd-service-name': 'aks'
   })
   sku: {
-    name: 'Automatic'
+    name: 'Base'
     tier: 'Standard'
   }
   identity: {
@@ -53,6 +53,9 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-02-previ
         osSKU: 'AzureLinux'
         osDiskType: 'Ephemeral'
         osDiskSizeGB: 0
+        availabilityZones: [
+          '2'
+        ]
       }
     ]
     
@@ -94,11 +97,6 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-02-previ
       metrics: {
         enabled: true
       }
-    }
-    
-    // Node provisioning - Auto mode for AKS Automatic
-    nodeProvisioningProfile: {
-      mode: 'Auto'
     }
     
     // Storage profile
