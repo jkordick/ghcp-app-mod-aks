@@ -46,7 +46,7 @@ containerize the python application for me, build and run the container afterwar
 - show already created Bicep files
 
 ````
- use bicep and azd to create an AKS automatic cluster in my azure subscription. use sweden central as region. deploy it afterwards.
+ use bicep and azd to create an AKS automatic cluster in my azure subscription. use sweden central as region. deploy it afterwards. do not deploy any applications yet.
  ```
 
 - use azd to deploy the Node JS application to AKS

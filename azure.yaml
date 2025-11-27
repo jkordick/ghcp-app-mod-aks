@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: app-mod-aks
+metadata:
+  template: app-mod-aks@0.0.1-beta
+
+# Services for the three applications
+services:
+  python-app:
+    language: python
+    host: aks
+    project: ./python-app
+    
+  js-app:
+    language: js
+    host: aks
+    project: ./js-app
+    
+  java-app:
+    language: java
+    host: aks
+    project: ./java-app
