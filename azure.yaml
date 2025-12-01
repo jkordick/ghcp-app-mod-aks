@@ -10,21 +10,38 @@ services:
     language: python
     host: aks
     project: ./python-app
+    k8s:
+      deploymentPath: ./manifests/python-app.yaml
     
   js-app:
     language: js
     host: aks
     project: ./js-app
+    k8s:
+      deploymentPath: ./manifests/js-app.yaml
     
   java-app:
     language: java
     host: aks
     project: ./java-app
+    k8s:
+      deploymentPath: ./manifests/java-app.yaml
 
 # Hooks to set environment variables after provisioning
 hooks:
   postprovision:
     shell: sh
     run: |
-      azd env set AZURE_AKS_CLUSTER_NAME $(azd env get-value AKS_CLUSTER_NAME)
-      azd env set AZURE_RESOURCE_GROUP $(azd env get-value AZURE_RESOURCE_GROUP)
+      echo "Setting AKS cluster environment variables..."
+      CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+      RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+      
+      if [ -n "$CLUSTER_NAME" ]; then
+        azd env set AZURE_AKS_CLUSTER_NAME "$CLUSTER_NAME"
+        echo "Set AZURE_AKS_CLUSTER_NAME=$CLUSTER_NAME"
+      fi
+      
+      if [ -n "$RESOURCE_GROUP" ]; then
+        azd env set AZURE_RESOURCE_GROUP "$RESOURCE_GROUP"
+        echo "Set AZURE_RESOURCE_GROUP=$RESOURCE_GROUP"
+      fi
