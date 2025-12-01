@@ -17,7 +17,7 @@ services:
     project: ./python-app
     resourceName: ${AKS_CLUSTER_NAME}
     k8s:
-      deploymentPath: ./manifests/python-app.yaml
+      deploymentPath: ../manifests/python-app.yaml
     
   js-app:
     language: js
@@ -25,7 +25,7 @@ services:
     project: ./js-app
     resourceName: ${AKS_CLUSTER_NAME}
     k8s:
-      deploymentPath: ./manifests/js-app.yaml
+      deploymentPath: ../manifests/js-app.yaml
     
   java-app:
     language: java
@@ -33,7 +33,7 @@ services:
     project: ./java-app
     resourceName: ${AKS_CLUSTER_NAME}
     k8s:
-      deploymentPath: ./manifests/java-app.yaml
+      deploymentPath: ../manifests/java-app.yaml
 
 # Hooks to set environment variables after provisioning
 hooks:
