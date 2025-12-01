@@ -56,7 +56,6 @@ module containerRegistry 'modules/container-registry.bicep' = {
     location: location
     tags: tags
     sku: 'Standard'
-    aksKubeletIdentityObjectId: aks.outputs.kubeletIdentityObjectId
   }
 }
 

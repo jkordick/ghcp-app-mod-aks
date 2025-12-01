@@ -87,6 +87,18 @@ jobs:
           kubectl cluster-info
           kubectl get nodes
 
+      - name: Attach ACR to AKS
+        run: |
+          echo "Attaching ACR to AKS cluster..."
+          az aks update \
+            --resource-group ${{ steps.deploy.outputs.resource_group }} \
+            --name ${{ steps.deploy.outputs.aks_cluster_name }} \
+            --attach-acr ${{ steps.deploy.outputs.acr_name }}
+          
+          echo "### ACR Attached to AKS ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "AKS can now pull images from ACR" >> $GITHUB_STEP_SUMMARY
+
       - name: Save deployment info
         run: |
           cat > deployment-info.json << EOF
