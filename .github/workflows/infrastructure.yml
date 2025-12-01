@@ -59,8 +59,27 @@ jobs:
             --parameters tags='{"project":"app-mod-aks","environment":"${{ env.ENVIRONMENT_NAME }}"}' \
             --output json > deployment-output.json
           
+          # Check deployment status
+          DEPLOYMENT_STATE=$(jq -r '.properties.provisioningState // empty' deployment-output.json)
+          echo "Deployment state: $DEPLOYMENT_STATE"
+          
+          if [ "$DEPLOYMENT_STATE" != "Succeeded" ]; then
+            echo "Deployment failed or did not complete successfully"
+            echo "Full deployment output:"
+            cat deployment-output.json
+            
+            # Try to get detailed error information
+            echo "Checking deployment operations for errors..."
+            az deployment sub show \
+              --name $DEPLOYMENT_NAME \
+              --query 'properties.error' \
+              --output json || true
+            
+            exit 1
+          fi
+          
           # Show deployment output for debugging
-          echo "Deployment output:"
+          echo "Deployment succeeded. Output:"
           cat deployment-output.json
           
           # Extract outputs with error checking
@@ -72,6 +91,9 @@ jobs:
           # Verify outputs are not empty
           if [ -z "$RESOURCE_GROUP" ] || [ -z "$AKS_CLUSTER_NAME" ] || [ -z "$ACR_NAME" ]; then
             echo "Error: Failed to extract deployment outputs"
+            echo "RESOURCE_GROUP: $RESOURCE_GROUP"
+            echo "AKS_CLUSTER_NAME: $AKS_CLUSTER_NAME"
+            echo "ACR_NAME: $ACR_NAME"
             exit 1
           fi
           
