@@ -4,12 +4,18 @@ name: app-mod-aks
 metadata:
   template: app-mod-aks@0.0.1-beta
 
+# Infrastructure configuration
+infra:
+  provider: bicep
+  path: ./infra
+
 # Services for the three applications
 services:
   python-app:
     language: python
     host: aks
     project: ./python-app
+    resourceName: ${AKS_CLUSTER_NAME}
     k8s:
       deploymentPath: ./manifests/python-app.yaml
     
@@ -17,6 +23,7 @@ services:
     language: js
     host: aks
     project: ./js-app
+    resourceName: ${AKS_CLUSTER_NAME}
     k8s:
       deploymentPath: ./manifests/js-app.yaml
     
@@ -24,6 +31,7 @@ services:
     language: java
     host: aks
     project: ./java-app
+    resourceName: ${AKS_CLUSTER_NAME}
     k8s:
       deploymentPath: ./manifests/java-app.yaml
 
