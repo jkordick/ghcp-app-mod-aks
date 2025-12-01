@@ -55,7 +55,9 @@ jobs:
           echo "Tests passed successfully" >> $GITHUB_STEP_SUMMARY
 
       - name: Install azd
-        uses: Azure/setup-azd@v1.0.0
+        run: |
+          curl -fsSL https://aka.ms/install-azd.sh | bash
+          echo "$HOME/.azd/bin" >> $GITHUB_PATH
 
       - name: Azure Login
         uses: azure/login@v2
