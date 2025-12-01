@@ -45,7 +45,7 @@ jobs:
       - name: Set azd environment
         run: |
           # Set environment name
-          azd env new ${{ env.AZURE_ENV_NAME }} --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }} || true
+          azd env new --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }} ${{ env.AZURE_ENV_NAME }} || true
           azd env select ${{ env.AZURE_ENV_NAME }}
           
           # Set required environment variables
