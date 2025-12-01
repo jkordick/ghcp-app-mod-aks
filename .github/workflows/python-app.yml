@@ -3,7 +3,7 @@ name: Deploy Python App
 on:
   push:
     branches:
-      - main
+      - step-6_ci-cd
     paths:
       - 'python-app/**'
       - 'manifests/python-app.yaml'

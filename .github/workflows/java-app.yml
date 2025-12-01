@@ -3,7 +3,7 @@ name: Deploy Java App
 on:
   push:
     branches:
-      - main
+      - step-6_ci-cd
     paths:
       - 'java-app/**'
       - 'manifests/java-app.yaml'

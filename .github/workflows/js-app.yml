@@ -3,7 +3,7 @@ name: Deploy JavaScript App
 on:
   push:
     branches:
-      - main
+      - step-6_ci-cd
     paths:
       - 'js-app/**'
       - 'manifests/js-app.yaml'

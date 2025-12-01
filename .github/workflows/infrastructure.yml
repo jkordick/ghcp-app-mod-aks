@@ -3,7 +3,7 @@ name: Deploy Infrastructure
 on:
   push:
     branches:
-      - main
+      - step-6_ci-cd
     paths:
       - 'infra/**'
       - '.github/workflows/infrastructure.yml'
