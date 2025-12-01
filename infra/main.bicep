@@ -14,7 +14,9 @@ param tags object = {}
 
 // Generate unique suffix for resource names
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
-var resourceGroupName = 'rg-${environmentName}-${resourceToken}'
+// Use shorter token to keep names under limits
+var shortToken = take(resourceToken, 8)
+var resourceGroupName = 'rg-${environmentName}-${shortToken}'
 
 // Create the resource group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
@@ -52,7 +54,7 @@ module containerRegistry 'modules/container-registry.bicep' = {
   name: 'container-registry-deployment'
   scope: resourceGroup
   params: {
-    name: 'acr${resourceToken}'
+    name: 'acr${shortToken}'
     location: location
     tags: tags
     sku: 'Standard'

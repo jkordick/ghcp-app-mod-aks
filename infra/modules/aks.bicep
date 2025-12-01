@@ -14,7 +14,11 @@ param kubernetesVersion string = '1.31'
 
 // Generate unique suffix for resource names
 var resourceToken = toLower(uniqueString(subscription().id, resourceGroup().name, name))
-var clusterName = '${name}-${resourceToken}'
+// Use shorter suffix to keep names under limits
+var shortToken = take(resourceToken, 8)
+var clusterName = '${name}-${shortToken}'
+// Shorter node resource group name to stay under 80 char limit (max allowed)
+var nodeResourceGroupName = 'rg-nodes-${shortToken}'
 
 // Create user-assigned managed identity for the cluster
 resource managedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
@@ -40,6 +44,7 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-02-previ
   properties: {
     kubernetesVersion: kubernetesVersion
     dnsPrefix: clusterName
+    nodeResourceGroup: nodeResourceGroupName
     enableRBAC: true
     
     // Agent pool profile - required even for Automatic mode
