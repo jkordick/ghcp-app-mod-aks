@@ -19,11 +19,6 @@ have a look at #file:js-app and update it to the latest node js version. after y
 - explain and show spec-kit usage
 - show generated spec-kit elements
 - show clarify
-
-````
-update #file:python-app to the latest python version. after the upgrade, run the app and test it
-````
- 
 - kick-off modernization using spec-kit
 - wait until ghcp is finished
 
@@ -34,10 +29,6 @@ update #file:python-app to the latest python version. after the upgrade, run the
 
 # Step 4: Show how to containerize the modernized applications
 - use GHCP to containerize the Python application
-
-```
-containerize the python application for me, build and run the container afterwards.
-```
 - show Dockerfile for Node JS application
 - show Dockerfile for Java application
 
@@ -45,9 +36,9 @@ containerize the python application for me, build and run the container afterwar
 - explain Azure MCP, BICEP, Azure Developer CLI
 - show already created Bicep files
 
-````
- use bicep and azd to create an AKS automatic cluster in my azure subscription. use sweden central as region. deploy it afterwards. do not deploy any applications yet.
- ```
+```
+ use bicep and azd to create an AKS automatic cluster in my azure subscription. use sweden central as region. deploy it afterwards.
+```
 
 - use azd to deploy the Node JS application to AKS
 
