@@ -20,7 +20,7 @@ on:
           - prod
 
 env:
-  AZURE_LOCATION: eastus
+  AZURE_LOCATION: swedencentral
 
 jobs:
   deploy-infrastructure:
