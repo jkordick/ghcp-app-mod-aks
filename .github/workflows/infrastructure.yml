@@ -1,4 +1,4 @@
-name: Deploy Infrastructure
+name: Provision Infrastructure (azd)
 
 on:
   push:
@@ -19,11 +19,16 @@ on:
           - staging
           - prod
 
+permissions:
+  id-token: write
+  contents: read
+
 env:
   AZURE_LOCATION: swedencentral
+  AZURE_ENV_NAME: app-mod-aks-${{ github.event.inputs.environment || 'dev' }}
 
 jobs:
-  deploy-infrastructure:
+  provision-infrastructure:
     runs-on: ubuntu-latest
     # environment: ${{ github.event.inputs.environment || 'dev' }}  # Uncomment when GitHub environments are configured
     
@@ -31,71 +36,48 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install azd
+        uses: Azure/setup-azd@v1.0.0
+
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set environment name
+      - name: Set azd environment
         id: set-env
         run: |
-          ENV_NAME="${{ github.event.inputs.environment || 'dev' }}"
-          echo "ENVIRONMENT_NAME=$ENV_NAME" >> $GITHUB_ENV
-          echo "environment_name=$ENV_NAME" >> $GITHUB_OUTPUT
+          # Create or select environment
+          azd env new ${{ env.AZURE_ENV_NAME }} --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }} || true
+          azd env select ${{ env.AZURE_ENV_NAME }}
+          
+          # Set required environment variables
+          azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          azd env set AZURE_LOCATION ${{ env.AZURE_LOCATION }}
+          azd env set AZURE_ENV_NAME ${{ env.AZURE_ENV_NAME }}
+          
+          echo "environment_name=${{ env.AZURE_ENV_NAME }}" >> $GITHUB_OUTPUT
 
-      - name: Deploy Bicep infrastructure
+      - name: Preview infrastructure changes
+        run: |
+          echo "### Infrastructure Preview 🔍" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          azd provision --preview 2>&1 | tee preview.txt || true
+          cat preview.txt >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Provision Azure infrastructure
         id: deploy
         run: |
-          # Create or get subscription deployment
-          DEPLOYMENT_NAME="infra-deployment-$(date +%Y%m%d-%H%M%S)"
+          echo "Provisioning infrastructure..."
+          azd provision --no-prompt
           
-          echo "Deploying infrastructure..."
-          az deployment sub create \
-            --name $DEPLOYMENT_NAME \
-            --location ${{ env.AZURE_LOCATION }} \
-            --template-file infra/main.bicep \
-            --parameters environmentName=${{ env.ENVIRONMENT_NAME }} \
-            --parameters location=${{ env.AZURE_LOCATION }} \
-            --parameters tags='{"project":"app-mod-aks","environment":"${{ env.ENVIRONMENT_NAME }}"}' \
-            --output json > deployment-output.json
-          
-          # Check deployment status
-          DEPLOYMENT_STATE=$(jq -r '.properties.provisioningState // empty' deployment-output.json)
-          echo "Deployment state: $DEPLOYMENT_STATE"
-          
-          if [ "$DEPLOYMENT_STATE" != "Succeeded" ]; then
-            echo "Deployment failed or did not complete successfully"
-            echo "Full deployment output:"
-            cat deployment-output.json
-            
-            # Try to get detailed error information
-            echo "Checking deployment operations for errors..."
-            az deployment sub show \
-              --name $DEPLOYMENT_NAME \
-              --query 'properties.error' \
-              --output json || true
-            
-            exit 1
-          fi
-          
-          # Show deployment output for debugging
-          echo "Deployment succeeded. Output:"
-          cat deployment-output.json
-          
-          # Extract outputs with error checking
-          RESOURCE_GROUP=$(jq -r '.properties.outputs.AZURE_RESOURCE_GROUP.value // empty' deployment-output.json)
-          AKS_CLUSTER_NAME=$(jq -r '.properties.outputs.AKS_CLUSTER_NAME.value // empty' deployment-output.json)
-          ACR_NAME=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_NAME.value // empty' deployment-output.json)
-          ACR_ENDPOINT=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT.value // empty' deployment-output.json)
-          
-          # Verify outputs are not empty
-          if [ -z "$RESOURCE_GROUP" ] || [ -z "$AKS_CLUSTER_NAME" ] || [ -z "$ACR_NAME" ]; then
-            echo "Error: Failed to extract deployment outputs"
-            echo "RESOURCE_GROUP: $RESOURCE_GROUP"
-            echo "AKS_CLUSTER_NAME: $AKS_CLUSTER_NAME"
-            echo "ACR_NAME: $ACR_NAME"
-            exit 1
-          fi
+          # Get deployment outputs
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          ACR_NAME=$(azd env get-value AZURE_CONTAINER_REGISTRY_NAME)
+          ACR_ENDPOINT=$(azd env get-value AZURE_CONTAINER_REGISTRY_ENDPOINT)
           
           # Set outputs
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
@@ -103,13 +85,13 @@ jobs:
           echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
           echo "acr_endpoint=$ACR_ENDPOINT" >> $GITHUB_OUTPUT
           
-          # Also set as environment variables for subsequent steps
+          # Also set as environment variables
           echo "RESOURCE_GROUP=$RESOURCE_GROUP" >> $GITHUB_ENV
           echo "AKS_CLUSTER_NAME=$AKS_CLUSTER_NAME" >> $GITHUB_ENV
           echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
           echo "ACR_ENDPOINT=$ACR_ENDPOINT" >> $GITHUB_ENV
           
-          echo "### Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "### Provisioning Complete ✅" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Resource Group:** $RESOURCE_GROUP" >> $GITHUB_STEP_SUMMARY
           echo "**AKS Cluster:** $AKS_CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,132 @@
+name: Azure Developer CLI Deployment
+
+on:
+  push:
+    branches:
+      - step-6_ci-cd
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_ENV_NAME: app-mod-aks-${{ github.event.inputs.environment || 'dev' }}
+
+jobs:
+  provision-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v1.0.0
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set azd environment
+        run: |
+          # Set environment name
+          azd env new ${{ env.AZURE_ENV_NAME }} --subscription ${{ secrets.AZURE_SUBSCRIPTION_ID }} || true
+          azd env select ${{ env.AZURE_ENV_NAME }}
+          
+          # Set required environment variables
+          azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          azd env set AZURE_LOCATION swedencentral
+          azd env set AZURE_ENV_NAME ${{ env.AZURE_ENV_NAME }}
+
+      - name: Preview infrastructure changes
+        run: |
+          echo "### Infrastructure Preview 🔍" >> $GITHUB_STEP_SUMMARY
+          azd provision --preview
+
+      - name: Provision Azure resources
+        run: |
+          azd provision --no-prompt
+          
+          echo "### Infrastructure Provisioned ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.AZURE_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Deploy all applications
+        run: |
+          azd deploy --all --no-prompt
+          
+          echo "### Applications Deployed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Python App (customer-profile-api)" >> $GITHUB_STEP_SUMMARY
+          echo "- JavaScript App (insurance-quote-api)" >> $GITHUB_STEP_SUMMARY
+          echo "- Java App (insurance-claims-api)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Get deployment outputs
+        id: outputs
+        run: |
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          ACR_NAME=$(azd env get-value AZURE_CONTAINER_REGISTRY_NAME)
+          
+          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
+          echo "aks_cluster_name=$AKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          
+          echo "### Deployment Details 📋" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** $RESOURCE_GROUP" >> $GITHUB_STEP_SUMMARY
+          echo "**AKS Cluster:** $AKS_CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "**Container Registry:** $ACR_NAME" >> $GITHUB_STEP_SUMMARY
+
+      - name: Get AKS credentials
+        run: |
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          
+          az aks get-credentials \
+            --resource-group $RESOURCE_GROUP \
+            --name $AKS_CLUSTER_NAME \
+            --overwrite-existing
+
+      - name: Verify deployments
+        run: |
+          echo "### Service Status 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get deployments >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          kubectl get services >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+      - name: Show service endpoints
+        run: |
+          echo "Waiting for external IPs..."
+          sleep 30
+          
+          PYTHON_IP=$(kubectl get service customer-profile-api -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
+          JS_IP=$(kubectl get service insurance-quote-api -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
+          JAVA_IP=$(kubectl get service insurance-claims-api -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
+          
+          echo "### Service Endpoints 🌐" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Python API:** http://$PYTHON_IP" >> $GITHUB_STEP_SUMMARY
+          echo "- **JavaScript API:** http://$JS_IP" >> $GITHUB_STEP_SUMMARY
+          echo "- **Java API:** http://$JAVA_IP" >> $GITHUB_STEP_SUMMARY
+
+    outputs:
+      resource_group: ${{ steps.outputs.outputs.resource_group }}
+      aks_cluster_name: ${{ steps.outputs.outputs.aks_cluster_name }}
+      acr_name: ${{ steps.outputs.outputs.acr_name }}

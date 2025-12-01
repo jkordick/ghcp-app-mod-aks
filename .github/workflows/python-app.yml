@@ -1,4 +1,4 @@
-name: Deploy Python App
+name: Deploy Python App (azd)
 
 on:
   push:
@@ -19,15 +19,14 @@ on:
           - dev
           - staging
           - prod
-      image_tag:
-        description: 'Docker image tag (leave empty for commit SHA)'
-        required: false
-        type: string
+
+permissions:
+  id-token: write
+  contents: read
 
 env:
-  APP_NAME: customer-profile-api
-  DOCKERFILE_PATH: python-app/Dockerfile
-  MANIFEST_PATH: manifests/python-app.yaml
+  AZURE_ENV_NAME: app-mod-aks-${{ github.event.inputs.environment || 'dev' }}
+  SERVICE_NAME: python-app
 
 jobs:
   build-and-deploy:
@@ -38,57 +37,54 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies and run tests
+        working-directory: python-app
+        run: |
+          pip install -r requirements.txt
+          pytest test_main.py -v
+          
+          echo "### Build Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Tests passed successfully" >> $GITHUB_STEP_SUMMARY
+
+      - name: Install azd
+        uses: Azure/setup-azd@v1.0.0
+
       - name: Azure Login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Set environment variables
-        id: vars
+      - name: Set azd environment
         run: |
-          ENV_NAME="${{ github.event.inputs.environment || 'dev' }}"
-          echo "ENVIRONMENT_NAME=$ENV_NAME" >> $GITHUB_ENV
-          
-          # Use provided tag or commit SHA
-          if [ -n "${{ github.event.inputs.image_tag }}" ]; then
-            IMAGE_TAG="${{ github.event.inputs.image_tag }}"
-          else
-            IMAGE_TAG="${GITHUB_SHA::7}"
-          fi
-          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
-          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
-          
-          # Get infrastructure details from secrets/variables
-          echo "RESOURCE_GROUP=${{ vars.AZURE_RESOURCE_GROUP || secrets.AZURE_RESOURCE_GROUP }}" >> $GITHUB_ENV
-          echo "AKS_CLUSTER_NAME=${{ vars.AKS_CLUSTER_NAME || secrets.AKS_CLUSTER_NAME }}" >> $GITHUB_ENV
-          echo "ACR_NAME=${{ vars.AZURE_CONTAINER_REGISTRY_NAME || secrets.AZURE_CONTAINER_REGISTRY_NAME }}" >> $GITHUB_ENV
+          # Select existing environment
+          azd env select ${{ env.AZURE_ENV_NAME }} || {
+            echo "Environment not found. Run infrastructure workflow first."
+            exit 1
+          }
 
-      - name: Get ACR login server
-        id: acr
+      - name: Deploy Python application
         run: |
-          ACR_LOGIN_SERVER=$(az acr show --name ${{ env.ACR_NAME }} --query loginServer -o tsv)
-          echo "ACR_LOGIN_SERVER=$ACR_LOGIN_SERVER" >> $GITHUB_ENV
-          echo "acr_login_server=$ACR_LOGIN_SERVER" >> $GITHUB_OUTPUT
-
-      - name: Build and push Docker image
-        run: |
-          # Login to ACR
-          az acr login --name ${{ env.ACR_NAME }}
+          azd deploy ${{ env.SERVICE_NAME }} --no-prompt
           
-          # Build image
-          docker build \
-            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }} \
-            -t ${{ env.ACR_LOGIN_SERVER }}/${{ env.APP_NAME }}:latest \
-            -f ${{ env.DOCKERFILE_PATH }} \
-            python-app/
-          
-          # Push images
-          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}
-          docker push ${{ env.ACR_LOGIN_SERVER }}/${{ env.APP_NAME }}:latest
-          
-          echo "### Docker Image Built ✅" >> $GITHUB_STEP_SUMMARY
+          echo "### Application Deployed ✅" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Image:** ${{ env.ACR_LOGIN_SERVER }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** customer-profile-api" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.AZURE_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Get deployment details
+        run: |
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          
+          echo "RESOURCE_GROUP=$RESOURCE_GROUP" >> $GITHUB_ENV
+          echo "AKS_CLUSTER_NAME=$AKS_CLUSTER_NAME" >> $GITHUB_ENV
 
       - name: Get AKS credentials
         run: |
@@ -97,54 +93,33 @@ jobs:
             --name ${{ env.AKS_CLUSTER_NAME }} \
             --overwrite-existing
 
-      - name: Update Kubernetes manifest
-        run: |
-          # Update image in manifest
-          sed -i "s|image: .*${{ env.APP_NAME }}:.*|image: ${{ env.ACR_LOGIN_SERVER }}/${{ env.APP_NAME }}:${{ env.IMAGE_TAG }}|g" ${{ env.MANIFEST_PATH }}
-          
-          # Show the updated manifest
-          echo "Updated manifest:"
-          cat ${{ env.MANIFEST_PATH }}
-
-      - name: Deploy to AKS
-        run: |
-          kubectl apply -f ${{ env.MANIFEST_PATH }}
-          
-          echo "### Deployed to AKS ✅" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Environment:** ${{ env.ENVIRONMENT_NAME }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Cluster:** ${{ env.AKS_CLUSTER_NAME }}" >> $GITHUB_STEP_SUMMARY
-
       - name: Wait for deployment rollout
         run: |
-          kubectl rollout status deployment/${{ env.APP_NAME }} --timeout=5m
-          
+          kubectl rollout status deployment/customer-profile-api --timeout=5m
+
       - name: Verify deployment
         run: |
-          echo "Deployment status:"
-          kubectl get deployment ${{ env.APP_NAME }}
-          
-          echo ""
-          echo "Pods:"
-          kubectl get pods -l app=${{ env.APP_NAME }}
-          
-          echo ""
-          echo "Service:"
-          kubectl get service ${{ env.APP_NAME }}
+          echo "### Deployment Status 📊" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          kubectl get deployment customer-profile-api >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -l app=customer-profile-api >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          kubectl get service customer-profile-api >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
       - name: Get service endpoint
         id: endpoint
         run: |
-          # Wait for external IP
           echo "Waiting for LoadBalancer external IP..."
           for i in {1..30}; do
-            EXTERNAL_IP=$(kubectl get service ${{ env.APP_NAME }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+            EXTERNAL_IP=$(kubectl get service customer-profile-api -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
             if [ -n "$EXTERNAL_IP" ]; then
-              echo "EXTERNAL_IP=$EXTERNAL_IP" >> $GITHUB_ENV
               echo "external_ip=$EXTERNAL_IP" >> $GITHUB_OUTPUT
               echo "### Service Endpoint 🌐" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY
-              echo "**URL:** http://$EXTERNAL_IP" >> $GITHUB_STEP_SUMMARY
+              echo "**URL:** http://$EXTERNAL_IP/health" >> $GITHUB_STEP_SUMMARY
               break
             fi
             sleep 10
@@ -153,13 +128,9 @@ jobs:
       - name: Run smoke tests
         if: steps.endpoint.outputs.external_ip != ''
         run: |
-          # Wait a bit for the service to be ready
           sleep 30
-          
-          # Test health endpoint
           echo "Testing health endpoint..."
-          curl -f http://${{ env.EXTERNAL_IP }}/health || echo "Health check failed"
+          curl -f http://${{ steps.endpoint.outputs.external_ip }}/health || echo "Health check failed"
 
     outputs:
-      image_tag: ${{ steps.vars.outputs.image_tag }}
       external_ip: ${{ steps.endpoint.outputs.external_ip }}
