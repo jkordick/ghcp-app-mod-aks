@@ -120,3 +120,4 @@ output clusterFqdn string = aksCluster.properties.fqdn
 output oidcIssuerUrl string = aksCluster.properties.oidcIssuerProfile.issuerURL
 output identityPrincipalId string = managedIdentity.properties.principalId
 output identityClientId string = managedIdentity.properties.clientId
+output kubeletIdentityObjectId string = aksCluster.properties.identityProfile.kubeletidentity.objectId

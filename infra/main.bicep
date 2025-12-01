@@ -47,8 +47,23 @@ module logAnalytics 'modules/log-analytics.bicep' = {
   }
 }
 
+// Deploy Azure Container Registry
+module containerRegistry 'modules/container-registry.bicep' = {
+  name: 'container-registry-deployment'
+  scope: resourceGroup
+  params: {
+    name: 'acr${resourceToken}'
+    location: location
+    tags: tags
+    sku: 'Standard'
+    aksKubeletIdentityObjectId: aks.outputs.kubeletIdentityObjectId
+  }
+}
+
 // Outputs
 output AZURE_RESOURCE_GROUP string = resourceGroup.name
 output AKS_CLUSTER_NAME string = aks.outputs.clusterName
 output AKS_CLUSTER_ID string = aks.outputs.clusterId
 output LOG_ANALYTICS_WORKSPACE_ID string = logAnalytics.outputs.workspaceId
+output AZURE_CONTAINER_REGISTRY_NAME string = containerRegistry.outputs.registryName
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerRegistry.outputs.registryLoginServer
