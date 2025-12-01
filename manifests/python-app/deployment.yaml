@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
       - name: customer-profile-api
-        image: acrvpbvcphf4lfwk.azurecr.io/customer-profile-api:latest
+        image: "{{ .Image }}"
         ports:
         - containerPort: 8000
         env:
