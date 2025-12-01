@@ -49,6 +49,7 @@ jobs:
           # Create or get subscription deployment
           DEPLOYMENT_NAME="infra-deployment-$(date +%Y%m%d-%H%M%S)"
           
+          echo "Deploying infrastructure..."
           az deployment sub create \
             --name $DEPLOYMENT_NAME \
             --location ${{ env.AZURE_LOCATION }} \
@@ -58,16 +59,33 @@ jobs:
             --parameters tags='{"project":"app-mod-aks","environment":"${{ env.ENVIRONMENT_NAME }}"}' \
             --output json > deployment-output.json
           
-          # Extract outputs
-          RESOURCE_GROUP=$(jq -r '.properties.outputs.AZURE_RESOURCE_GROUP.value' deployment-output.json)
-          AKS_CLUSTER_NAME=$(jq -r '.properties.outputs.AKS_CLUSTER_NAME.value' deployment-output.json)
-          ACR_NAME=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_NAME.value' deployment-output.json)
-          ACR_ENDPOINT=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT.value' deployment-output.json)
+          # Show deployment output for debugging
+          echo "Deployment output:"
+          cat deployment-output.json
           
+          # Extract outputs with error checking
+          RESOURCE_GROUP=$(jq -r '.properties.outputs.AZURE_RESOURCE_GROUP.value // empty' deployment-output.json)
+          AKS_CLUSTER_NAME=$(jq -r '.properties.outputs.AKS_CLUSTER_NAME.value // empty' deployment-output.json)
+          ACR_NAME=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_NAME.value // empty' deployment-output.json)
+          ACR_ENDPOINT=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT.value // empty' deployment-output.json)
+          
+          # Verify outputs are not empty
+          if [ -z "$RESOURCE_GROUP" ] || [ -z "$AKS_CLUSTER_NAME" ] || [ -z "$ACR_NAME" ]; then
+            echo "Error: Failed to extract deployment outputs"
+            exit 1
+          fi
+          
+          # Set outputs
           echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
           echo "aks_cluster_name=$AKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
           echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
           echo "acr_endpoint=$ACR_ENDPOINT" >> $GITHUB_OUTPUT
+          
+          # Also set as environment variables for subsequent steps
+          echo "RESOURCE_GROUP=$RESOURCE_GROUP" >> $GITHUB_ENV
+          echo "AKS_CLUSTER_NAME=$AKS_CLUSTER_NAME" >> $GITHUB_ENV
+          echo "ACR_NAME=$ACR_NAME" >> $GITHUB_ENV
+          echo "ACR_ENDPOINT=$ACR_ENDPOINT" >> $GITHUB_ENV
           
           echo "### Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -77,9 +95,10 @@ jobs:
 
       - name: Get AKS credentials
         run: |
+          echo "Getting credentials for cluster: ${{ env.AKS_CLUSTER_NAME }} in RG: ${{ env.RESOURCE_GROUP }}"
           az aks get-credentials \
-            --resource-group ${{ steps.deploy.outputs.resource_group }} \
-            --name ${{ steps.deploy.outputs.aks_cluster_name }} \
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.AKS_CLUSTER_NAME }} \
             --overwrite-existing
 
       - name: Verify AKS cluster access
@@ -91,9 +110,9 @@ jobs:
         run: |
           echo "Attaching ACR to AKS cluster..."
           az aks update \
-            --resource-group ${{ steps.deploy.outputs.resource_group }} \
-            --name ${{ steps.deploy.outputs.aks_cluster_name }} \
-            --attach-acr ${{ steps.deploy.outputs.acr_name }}
+            --resource-group ${{ env.RESOURCE_GROUP }} \
+            --name ${{ env.AKS_CLUSTER_NAME }} \
+            --attach-acr ${{ env.ACR_NAME }}
           
           echo "### ACR Attached to AKS ✅" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -104,10 +123,10 @@ jobs:
           cat > deployment-info.json << EOF
           {
             "environment": "${{ env.ENVIRONMENT_NAME }}",
-            "resourceGroup": "${{ steps.deploy.outputs.resource_group }}",
-            "aksClusterName": "${{ steps.deploy.outputs.aks_cluster_name }}",
-            "acrName": "${{ steps.deploy.outputs.acr_name }}",
-            "acrEndpoint": "${{ steps.deploy.outputs.acr_endpoint }}",
+            "resourceGroup": "${{ env.RESOURCE_GROUP }}",
+            "aksClusterName": "${{ env.AKS_CLUSTER_NAME }}",
+            "acrName": "${{ env.ACR_NAME }}",
+            "acrEndpoint": "${{ env.ACR_ENDPOINT }}",
             "deploymentTime": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           }
           EOF
