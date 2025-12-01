@@ -54,7 +54,9 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2024-09-02-previ
         osDiskType: 'Ephemeral'
         osDiskSizeGB: 0
         availabilityZones: [
+          '1'
           '2'
+          '3'
         ]
       }
     ]
