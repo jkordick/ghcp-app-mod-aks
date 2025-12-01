@@ -1,0 +1,115 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/**'
+      - '.github/workflows/infrastructure.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AZURE_LOCATION: eastus
+
+jobs:
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set environment name
+        id: set-env
+        run: |
+          ENV_NAME="${{ github.event.inputs.environment || 'dev' }}"
+          echo "ENVIRONMENT_NAME=$ENV_NAME" >> $GITHUB_ENV
+          echo "environment_name=$ENV_NAME" >> $GITHUB_OUTPUT
+
+      - name: Deploy Bicep infrastructure
+        id: deploy
+        run: |
+          # Create or get subscription deployment
+          DEPLOYMENT_NAME="infra-deployment-$(date +%Y%m%d-%H%M%S)"
+          
+          az deployment sub create \
+            --name $DEPLOYMENT_NAME \
+            --location ${{ env.AZURE_LOCATION }} \
+            --template-file infra/main.bicep \
+            --parameters environmentName=${{ env.ENVIRONMENT_NAME }} \
+            --parameters location=${{ env.AZURE_LOCATION }} \
+            --parameters tags='{"project":"app-mod-aks","environment":"${{ env.ENVIRONMENT_NAME }}"}' \
+            --output json > deployment-output.json
+          
+          # Extract outputs
+          RESOURCE_GROUP=$(jq -r '.properties.outputs.AZURE_RESOURCE_GROUP.value' deployment-output.json)
+          AKS_CLUSTER_NAME=$(jq -r '.properties.outputs.AKS_CLUSTER_NAME.value' deployment-output.json)
+          ACR_NAME=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_NAME.value' deployment-output.json)
+          ACR_ENDPOINT=$(jq -r '.properties.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT.value' deployment-output.json)
+          
+          echo "resource_group=$RESOURCE_GROUP" >> $GITHUB_OUTPUT
+          echo "aks_cluster_name=$AKS_CLUSTER_NAME" >> $GITHUB_OUTPUT
+          echo "acr_name=$ACR_NAME" >> $GITHUB_OUTPUT
+          echo "acr_endpoint=$ACR_ENDPOINT" >> $GITHUB_OUTPUT
+          
+          echo "### Deployment Complete ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** $RESOURCE_GROUP" >> $GITHUB_STEP_SUMMARY
+          echo "**AKS Cluster:** $AKS_CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "**Container Registry:** $ACR_NAME" >> $GITHUB_STEP_SUMMARY
+
+      - name: Get AKS credentials
+        run: |
+          az aks get-credentials \
+            --resource-group ${{ steps.deploy.outputs.resource_group }} \
+            --name ${{ steps.deploy.outputs.aks_cluster_name }} \
+            --overwrite-existing
+
+      - name: Verify AKS cluster access
+        run: |
+          kubectl cluster-info
+          kubectl get nodes
+
+      - name: Save deployment info
+        run: |
+          cat > deployment-info.json << EOF
+          {
+            "environment": "${{ env.ENVIRONMENT_NAME }}",
+            "resourceGroup": "${{ steps.deploy.outputs.resource_group }}",
+            "aksClusterName": "${{ steps.deploy.outputs.aks_cluster_name }}",
+            "acrName": "${{ steps.deploy.outputs.acr_name }}",
+            "acrEndpoint": "${{ steps.deploy.outputs.acr_endpoint }}",
+            "deploymentTime": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+          cat deployment-info.json
+
+      - name: Upload deployment info
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-info-${{ env.ENVIRONMENT_NAME }}
+          path: deployment-info.json
+          retention-days: 30
+
+    outputs:
+      resource_group: ${{ steps.deploy.outputs.resource_group }}
+      aks_cluster_name: ${{ steps.deploy.outputs.aks_cluster_name }}
+      acr_name: ${{ steps.deploy.outputs.acr_name }}
+      acr_endpoint: ${{ steps.deploy.outputs.acr_endpoint }}
