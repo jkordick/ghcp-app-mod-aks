@@ -49,7 +49,12 @@ jobs:
       - name: Set azd environment
         run: |
           SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.subscriptionId')
-          azd env new ${{ env.AZURE_ENV_NAME }} --subscription $SUBSCRIPTION_ID --location ${{ env.AZURE_LOCATION }} || true
+          
+          # Remove existing environment to ensure clean state
+          azd env delete ${{ env.AZURE_ENV_NAME }} --force --purge || true
+          
+          # Create fresh environment
+          azd env new ${{ env.AZURE_ENV_NAME }} --subscription $SUBSCRIPTION_ID --location ${{ env.AZURE_LOCATION }}
           azd env select ${{ env.AZURE_ENV_NAME }}
           azd env set AZURE_SUBSCRIPTION_ID $SUBSCRIPTION_ID
           azd env set AZURE_LOCATION ${{ env.AZURE_LOCATION }}
