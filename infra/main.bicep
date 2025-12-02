@@ -61,6 +61,16 @@ module containerRegistry 'modules/container-registry.bicep' = {
   }
 }
 
+// Role assignment: Allow AKS kubelet identity to pull from ACR
+module acrPullRole 'modules/acr-pull-role.bicep' = {
+  name: 'acr-pull-role-deployment'
+  scope: resourceGroup
+  params: {
+    acrName: containerRegistry.outputs.registryName
+    kubeletIdentityObjectId: aks.outputs.kubeletIdentityObjectId
+  }
+}
+
 // Outputs
 output AZURE_RESOURCE_GROUP string = resourceGroup.name
 output AKS_CLUSTER_NAME string = aks.outputs.clusterName

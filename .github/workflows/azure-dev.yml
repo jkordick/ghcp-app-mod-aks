@@ -79,6 +79,22 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ env.AZURE_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
 
+      - name: Ensure AKS can pull from ACR
+        run: |
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          ACR_NAME=$(azd env get-value AZURE_CONTAINER_REGISTRY_NAME)
+          
+          echo "Verifying AKS-ACR integration..."
+          
+          # Check if AKS can already pull from ACR (role assignment from Bicep may have worked)
+          if az aks check-acr --name $AKS_CLUSTER_NAME --resource-group $RESOURCE_GROUP --acr $ACR_NAME.azurecr.io 2>&1 | grep -q "SUCCEEDED"; then
+            echo "AKS already has ACR pull permissions"
+          else
+            echo "Attaching ACR to AKS cluster..."
+            az aks update --name $AKS_CLUSTER_NAME --resource-group $RESOURCE_GROUP --attach-acr $ACR_NAME
+          fi
+
       - name: Deploy all applications
         run: |
           azd deploy --all --no-prompt
