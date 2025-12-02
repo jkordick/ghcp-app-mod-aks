@@ -144,4 +144,6 @@ target/
 # Azure Developer CLI
 .azure/
 
+.DS_Store
+
 

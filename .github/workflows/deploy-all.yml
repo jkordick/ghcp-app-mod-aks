@@ -61,7 +61,8 @@ jobs:
 
       - name: Provision Azure Infrastructure
         run: |
-          azd provision --no-prompt
+          # Use --no-state to force fresh deployment without comparing to previous state
+          azd provision --no-prompt --no-state
           
           echo "### Infrastructure Provisioned ✅" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** ${{ env.AZURE_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
