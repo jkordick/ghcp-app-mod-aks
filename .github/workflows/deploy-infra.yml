@@ -1,0 +1,101 @@
+name: Deploy Infrastructure
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/**'
+      - 'azure.yaml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_ENV_NAME: app-mod-aks-${{ github.event.inputs.environment || 'dev' }}
+  AZURE_LOCATION: swedencentral
+
+jobs:
+  deploy-infra:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in with Azure Developer CLI
+        run: |
+          $info = $Env:AZURE_CREDENTIALS | ConvertFrom-Json -AsHashtable
+          azd auth login --client-id "$($info.clientId)" --client-secret "$($info.clientSecret)" --tenant-id "$($info.tenantId)"
+        shell: pwsh
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set azd environment
+        run: |
+          SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.subscriptionId')
+          azd env new ${{ env.AZURE_ENV_NAME }} --subscription $SUBSCRIPTION_ID --location ${{ env.AZURE_LOCATION }} || true
+          azd env select ${{ env.AZURE_ENV_NAME }}
+          azd env set AZURE_SUBSCRIPTION_ID $SUBSCRIPTION_ID
+          azd env set AZURE_LOCATION ${{ env.AZURE_LOCATION }}
+
+      - name: Preview infrastructure changes
+        run: |
+          echo "### Infrastructure Preview 🔍" >> $GITHUB_STEP_SUMMARY
+          azd provision --preview 2>&1 | tee preview.txt || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat preview.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Provision Azure Infrastructure
+        run: |
+          azd provision --no-prompt
+          
+          echo "### Infrastructure Provisioned ✅" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.AZURE_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Ensure AKS can pull from ACR
+        run: |
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          ACR_NAME=$(azd env get-value AZURE_CONTAINER_REGISTRY_NAME)
+          
+          echo "Verifying AKS-ACR integration..."
+          if az aks check-acr --name $AKS_CLUSTER_NAME --resource-group $RESOURCE_GROUP --acr $ACR_NAME.azurecr.io 2>&1 | grep -q "SUCCEEDED"; then
+            echo "AKS already has ACR pull permissions"
+          else
+            echo "Attaching ACR to AKS cluster..."
+            az aks update --name $AKS_CLUSTER_NAME --resource-group $RESOURCE_GROUP --attach-acr $ACR_NAME
+          fi
+
+      - name: Output deployment details
+        run: |
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          ACR_NAME=$(azd env get-value AZURE_CONTAINER_REGISTRY_NAME)
+          
+          echo "### Deployment Details 📋" >> $GITHUB_STEP_SUMMARY
+          echo "**Resource Group:** $RESOURCE_GROUP" >> $GITHUB_STEP_SUMMARY
+          echo "**AKS Cluster:** $AKS_CLUSTER_NAME" >> $GITHUB_STEP_SUMMARY
+          echo "**Container Registry:** $ACR_NAME" >> $GITHUB_STEP_SUMMARY

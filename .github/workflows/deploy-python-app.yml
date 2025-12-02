@@ -1,0 +1,92 @@
+name: Deploy Python App
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'python-app/**'
+      - 'manifests/python-app/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AZURE_ENV_NAME: app-mod-aks-${{ github.event.inputs.environment || 'dev' }}
+  AZURE_LOCATION: swedencentral
+  SERVICE_NAME: python-app
+
+jobs:
+  deploy-python-app:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Log in with Azure Developer CLI
+        run: |
+          $info = $Env:AZURE_CREDENTIALS | ConvertFrom-Json -AsHashtable
+          azd auth login --client-id "$($info.clientId)" --client-secret "$($info.clientSecret)" --tenant-id "$($info.tenantId)"
+        shell: pwsh
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Set azd environment
+        run: |
+          SUBSCRIPTION_ID=$(echo '${{ secrets.AZURE_CREDENTIALS }}' | jq -r '.subscriptionId')
+          azd env new ${{ env.AZURE_ENV_NAME }} --subscription $SUBSCRIPTION_ID --location ${{ env.AZURE_LOCATION }} || true
+          azd env select ${{ env.AZURE_ENV_NAME }}
+          azd env set AZURE_SUBSCRIPTION_ID $SUBSCRIPTION_ID
+          azd env set AZURE_LOCATION ${{ env.AZURE_LOCATION }}
+
+      - name: Refresh environment values
+        run: |
+          azd env refresh --no-prompt
+
+      - name: Deploy Python App
+        run: |
+          azd deploy ${{ env.SERVICE_NAME }} --no-prompt
+          
+          echo "### Python App Deployed ✅" >> $GITHUB_STEP_SUMMARY
+          echo "**Service:** customer-profile-api" >> $GITHUB_STEP_SUMMARY
+          echo "**Environment:** ${{ env.AZURE_ENV_NAME }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Verify deployment
+        run: |
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          AKS_CLUSTER_NAME=$(azd env get-value AKS_CLUSTER_NAME)
+          
+          az aks get-credentials --resource-group $RESOURCE_GROUP --name $AKS_CLUSTER_NAME --overwrite-existing
+          
+          echo "### Deployment Status 🚀" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          kubectl get pods -l app=customer-profile-api >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Wait for external IP
+          sleep 30
+          PYTHON_IP=$(kubectl get service customer-profile-api -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "pending")
+          echo "### Service Endpoint 🌐" >> $GITHUB_STEP_SUMMARY
+          echo "**Python API:** http://$PYTHON_IP" >> $GITHUB_STEP_SUMMARY
