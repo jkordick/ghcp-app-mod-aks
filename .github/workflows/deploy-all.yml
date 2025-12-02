@@ -59,6 +59,17 @@ jobs:
           azd env set AZURE_SUBSCRIPTION_ID $SUBSCRIPTION_ID
           azd env set AZURE_LOCATION ${{ env.AZURE_LOCATION }}
 
+      - name: Clean up old ARM deployments
+        run: |
+          # Delete any stale subscription-level deployments to ensure fresh provision
+          echo "Cleaning up old ARM deployments..."
+          az deployment sub list --query "[?starts_with(name, '${{ env.AZURE_ENV_NAME }}')].name" -o tsv | while read name; do
+            echo "Deleting deployment: $name"
+            az deployment sub delete --name "$name" --no-wait || true
+          done
+          # Give Azure a moment to process deletions
+          sleep 5
+
       - name: Provision Azure Infrastructure
         run: |
           # Use --no-state to force fresh deployment without comparing to previous state
